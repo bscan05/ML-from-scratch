@@ -1,33 +1,7 @@
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
-
-
-def data_prepration(name,test_size):
-
-    data_file = pd.read_csv(name)
-    data_file = data_file.sample(frac = 1)
-
-    data_file.pop("artist_name")
-    data_file.pop("track_name")
-    data_file.pop("track_id")
-
-
-    genre_data = data_file.pop("genre")
-    data_file = pd.get_dummies(data_file,columns=["mode","key","time_signature"],dtype=int)
-    genre_data = pd.get_dummies(genre_data,columns=["genre"],dtype=int)
-    data_file = (data_file - data_file.mean()) / data_file.std()
-
-    index = round((1 - test_size) * len(data_file)) 
-    X_Train = data_file[:index]
-    x_test = data_file[index:]
-
-    Y_Train = genre_data[:index]
-    y_test = genre_data[index:]
-
-
-
-    return X_Train,x_test,Y_Train,y_test
+from data_prep import data_prepration
 
 """
 arrays will be used: 
@@ -55,8 +29,8 @@ arrays will be used:
 """
 
 n_input_neurons = 30
-n_1st_hidden = 30
-n_2nd_hidden = 30
+n_1st_hidden = 40
+n_2nd_hidden = 40
 n_output_neurons = 27
 
 
@@ -233,13 +207,13 @@ def train(learning_rate,type_of_non,mini_batch_size,epoch,X_Train,Y_Train):
 def test(type_of_non,x_test,y_test):
 
     accuracy = 0
+    x_test = x_test.values
+    y_test = y_test.values
 
-    for i in range(len(x_test)):
-        row = x_test.iloc[i]
-        y_true = y_test.iloc[i]
-        result = forward_propagate(row, type_of_non, scores, hidden_outputs, output)
-        if calc_accuracy(result, y_true):
-            accuracy += 1
+    result = forward_propagate(x_test, type_of_non, scores, hidden_outputs, output)
+    y_pred_classes = np.argmax(result, axis=1)
+    y_true_classes = np.argmax(y_test, axis=1)
+    accuracy += np.sum(y_pred_classes == y_true_classes)
     
     print("Accuracy: ",(accuracy*100) / len(x_test),"%")
                 
@@ -248,10 +222,10 @@ X_Train,x_test,Y_Train,y_test = data_prepration("Spotify_Features.csv",test_size
 
 
 
-learning_rate = 0.01
+learning_rate = 0.001
 type_of_non = "tanh"
-mini_batch_size = 2048
-epoch = 100
+mini_batch_size = 512
+epoch = 200
 
 train(learning_rate,type_of_non,mini_batch_size,epoch,X_Train,Y_Train)
 
