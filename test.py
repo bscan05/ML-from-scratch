@@ -2,64 +2,28 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
-def data_prepration(name):
+# Data Preparation Function
+def data_prepration(name, test_size):
     data_file = pd.read_csv(name)
-    data_file = data_file.sample(frac=1)
-    data_file.pop("artist_name")
-    data_file.pop("track_name")
-    data_file.pop("track_id")
+    data_file = data_file.sample(frac=1).reset_index(drop=True)
+
+    data_file.drop(["artist_name", "track_name", "track_id"], axis=1, inplace=True)
+
     genre_data = data_file.pop("genre")
     data_file = pd.get_dummies(data_file, columns=["mode", "key", "time_signature"], dtype=int)
-    genre_data = pd.get_dummies(genre_data, columns=["genre"], dtype=int)
+    genre_data = pd.get_dummies(genre_data, dtype=int)
     data_file = (data_file - data_file.mean()) / data_file.std()
-    return data_file, genre_data
 
+    index = round((1 - test_size) * len(data_file))
+    X_Train = data_file[:index].reset_index(drop=True)
+    x_test = data_file[index:].reset_index(drop=True)
 
-n_input_neurons = 30
-n_1st_hidden = 40
-n_2nd_hidden = 40
-n_output_neurons = 27
+    Y_Train = genre_data[:index].reset_index(drop=True)
+    y_test = genre_data[index:].reset_index(drop=True)
 
-xavier_treshold = np.sqrt(6 / (n_input_neurons + n_output_neurons))
+    return X_Train, x_test, Y_Train, y_test
 
-w1 = np.random.uniform(-xavier_treshold, xavier_treshold, (n_input_neurons,n_1st_hidden))
-w2 = np.random.uniform(-xavier_treshold, xavier_treshold, (n_1st_hidden,n_2nd_hidden))
-w3 = np.random.uniform(-xavier_treshold, xavier_treshold, (n_2nd_hidden,n_output_neurons))
-
-weights = {"W1": w1,"W2": w2,"W3": w3}
-
-input = np.zeros(n_input_neurons)
-
-output = np.array(n_output_neurons)
-
-b0 = np.random.rand(n_1st_hidden)
-b1 = np.random.rand(n_2nd_hidden)
-b2 = np.random.rand(n_output_neurons)
-
-biases = {"B0" : b0,"B1" : b1,"B2" : b2}
-
-
-b0_gradient = np.zeros(n_1st_hidden)
-b1_gradient = np.zeros(n_2nd_hidden)
-b2_gradient = np.zeros(n_output_neurons)
-
-bias_gradients = {"B0" : b0_gradient,"B1" : b1_gradient,"B2" : b2_gradient}
-
-# +1s are for biases
-gr1 = np.random.rand(n_input_neurons,n_1st_hidden)
-gr2 = np.random.rand(n_1st_hidden,n_2nd_hidden)
-gr3 = np.random.rand(n_2nd_hidden,n_output_neurons)
-
-gradients = {"Gr1": gr1,"Gr2": gr2,"Gr3": gr3}
-
-scores = np.array([np.array(n_1st_hidden), np.array(n_2nd_hidden),np.array(n_output_neurons)], dtype=object)
-hidden_outputs = np.array([np.array(n_1st_hidden), np.array(n_2nd_hidden)], dtype=object)
-
-deltas = np.array([np.array(n_1st_hidden), np.array(n_2nd_hidden),np.array(n_output_neurons)], dtype=object)
-
-
-
-
+# Activation Functions
 def non_linearity(type, x):
     if type == "sigmoid":
         return 1 / (1 + np.exp(-x))
@@ -73,101 +37,176 @@ def deriv_nonlinearity(type, x):
         s = 1 / (1 + np.exp(-x))
         return s * (1 - s)
     elif type == "relu":
-        return np.where(x > 0, 1, 0)
+        return np.where(x > 0, 1.0, 0.0)
     elif type == "tanh":
-        return 1 - np.tanh(x)**2
+        return 1 - np.tanh(x) ** 2
 
 def softmax(x):
-    return np.exp(x) / np.sum(np.exp(x), axis=0)
-
-def forward_propagate(input, type_of_non, scores, hidden_outputs, output):
-    scores[0] = np.dot(weights["W1"].T, input) + biases["B0"]
-    hidden_outputs[0] = non_linearity(type_of_non, scores[0])
-    scores[1] = np.dot(weights["W2"].T, hidden_outputs[0]) + biases["B1"]
-    hidden_outputs[1] = non_linearity(type_of_non, scores[1])
-    scores[2] = np.dot(weights["W3"].T, hidden_outputs[1]) + biases["B2"]
-    output = softmax(scores[2])
-    return output
-
-def log_loss(y_pred, y_real):
-    loss = -np.sum(y_real * np.log(y_pred))
-    return loss
+    exp_x = np.exp(x - np.max(x, axis=1, keepdims=True))  # Stability improvement
+    return exp_x / np.sum(exp_x, axis=1, keepdims=True)
 
 def calc_accuracy(y_pred, y_true):
-    y_pred_class = np.argmax(y_pred)
-    y_true_class = np.argmax(y_true)
-    return y_pred_class == y_true_class
+    y_pred_class = np.argmax(y_pred, axis=1)
+    y_true_class = np.argmax(y_true, axis=1)
+    return np.sum(y_pred_class == y_true_class) / len(y_true_class)
 
-def back_prop(y_real, y_pred, type_of_non):
-    deltas[2] = y_pred - y_real
-    deltas[1] = np.dot(weights["W3"], deltas[2]) * deriv_nonlinearity(type_of_non, scores[1])
-    deltas[0] = np.dot(weights["W2"], deltas[1]) * deriv_nonlinearity(type_of_non, scores[0])
+# Forward Propagation
+def forward_propagate(input, type_of_non):
+    # First hidden layer
+    scores_1 = np.dot(input, weights["W1"]) + biases["B0"]
+    hidden_output_1 = non_linearity(type_of_non, scores_1)
 
-def calc_gradients(input_data):
-    pass
+    # Second hidden layer
+    scores_2 = np.dot(hidden_output_1, weights["W2"]) + biases["B1"]
+    hidden_output_2 = non_linearity(type_of_non, scores_2)
 
-# Data Preparation
-data_file, genre_data = data_prepration("Spotify_Features.csv")
+    # Third hidden layer
+    scores_3 = np.dot(hidden_output_2, weights["W3"]) + biases["B2"]
+    hidden_output_3 = non_linearity(type_of_non, scores_3)
 
-# Training Loop
-epoch = 20
-learning_rate = 0.01
-data_size = 512
-non_linearity_type = "tanh"
+    # Output layer
+    scores_4 = np.dot(hidden_output_3, weights["W4"]) + biases["B3"]
+    y_pred = softmax(scores_4)
 
-for k in range(epoch):
-    
-    num_of_batch = 400
-    accuracy = 0
-    for j in tqdm(range(num_of_batch), desc="Batch", unit="iteration"):
-        accuracy = 0
-        for i in range(data_size):
+    return scores_1, hidden_output_1, scores_2, hidden_output_2, scores_3, hidden_output_3, scores_4, y_pred
 
-            i = j*data_size + i
+# Backpropagation
+def back_prop(input, y_real, scores, hidden_outputs, y_pred, type_of_non):
+    # Unpack scores and hidden outputs
+    scores_1, hidden_output_1, scores_2, hidden_output_2, scores_3, hidden_output_3, scores_4 = scores
+    _, _, _, _, _, _, y_pred = hidden_outputs
 
-            row = data_file.iloc[i]
-            y_true = genre_data.iloc[i]
-            result = forward_propagate(row, non_linearity_type, scores, hidden_outputs, output)
-            back_prop(y_true, result, non_linearity_type)
+    # Output layer deltas
+    delta_4 = y_pred - y_real
 
-            gradients["Gr3"] += np.outer(hidden_outputs[1], deltas[2])
-            gradients["Gr2"] += np.outer(hidden_outputs[0], deltas[1])
-            gradients["Gr1"] += np.outer(row, deltas[0])
+    # Third hidden layer deltas
+    delta_3 = np.dot(delta_4, weights["W4"].T) * deriv_nonlinearity(type_of_non, scores_3)
 
-            bias_gradients["B0"] += deltas[0]
-            bias_gradients["B1"] += deltas[1]
-            bias_gradients["B2"] += deltas[2]
+    # Second hidden layer deltas
+    delta_2 = np.dot(delta_3, weights["W3"].T) * deriv_nonlinearity(type_of_non, scores_2)
 
-            if calc_accuracy(result, y_true):
-                accuracy += 1
+    # First hidden layer deltas
+    delta_1 = np.dot(delta_2, weights["W2"].T) * deriv_nonlinearity(type_of_non, scores_1)
 
-        # Update weights
-        weights["W3"] -= gradients["Gr3"] * (learning_rate / data_size)
-        weights["W2"] -= gradients["Gr2"] * (learning_rate / data_size)
-        weights["W1"] -= gradients["Gr1"] * (learning_rate / data_size)
+    # Gradients for weights
+    gradients["Gr4"] = np.dot(hidden_output_3.T, delta_4) / input.shape[0]
+    gradients["Gr3"] = np.dot(hidden_output_2.T, delta_3) / input.shape[0]
+    gradients["Gr2"] = np.dot(hidden_output_1.T, delta_2) / input.shape[0]
+    gradients["Gr1"] = np.dot(input.T, delta_1) / input.shape[0]
 
-        biases["B0"] -= bias_gradients["B0"] * (learning_rate / data_size)
-        biases["B1"] -= bias_gradients["B1"] * (learning_rate / data_size)
-        biases["B2"] -= bias_gradients["B2"] * (learning_rate / data_size)
-        
-        # Clear gradients
-        gradients["Gr1"] = np.zeros((n_input_neurons, n_1st_hidden))
-        gradients["Gr2"] = np.zeros((n_1st_hidden, n_2nd_hidden))
-        gradients["Gr3"] = np.zeros((n_2nd_hidden, n_output_neurons))
+    # Gradients for biases
+    bias_gradients["BiasGr3"] = np.mean(delta_4, axis=0)
+    bias_gradients["BiasGr2"] = np.mean(delta_3, axis=0)
+    bias_gradients["BiasGr1"] = np.mean(delta_2, axis=0)
+    bias_gradients["BiasGr0"] = np.mean(delta_1, axis=0)
 
+# Training Function
+def train(learning_rate, type_of_non, mini_batch_size, epoch, X_Train, Y_Train):
+    X_Train = X_Train.values
+    Y_Train = Y_Train.values
 
-        bias_gradients["B0"] = np.zeros(n_1st_hidden)
-        bias_gradients["B1"] = np.zeros(n_2nd_hidden)
-        bias_gradients["B2"] = np.zeros(n_output_neurons)
+    t = 0  # Timestep for Adam optimizer
+    for i in range(epoch):
+        total_batches = int(np.ceil(len(X_Train) / mini_batch_size))
+        indices = np.random.permutation(len(X_Train))  # Shuffle data
+        X_Train, Y_Train = X_Train[indices], Y_Train[indices]
 
-    print(f"Epoch: {k + 1}/{epoch}, Accuracy: {(accuracy*100) / (data_size):.4f}%")
+        for j in tqdm(range(total_batches), desc=f"Epoch {i+1}/{epoch}", unit="batch"):
+            t += 1  # Increment timestep
 
-# Evaluation on a random subset of data
-random_indices = np.random.randint(0, len(data_file), 20000)
-accuracy = 0
-for i in random_indices:
-    row = data_file.iloc[i]
-    y_true = genre_data.iloc[i]
-    result = forward_propagate(row, non_linearity_type, scores, hidden_outputs, output)
-    if calc_accuracy(result, y_true):
-        accuracy += 1
+            # Mini-batch extraction
+            start_idx = j * mini_batch_size
+            end_idx = min(start_idx + mini_batch_size, len(X_Train))
+            X_batch = X_Train[start_idx:end_idx]
+            Y_batch = Y_Train[start_idx:end_idx]
+
+            # Forward propagation
+            scores = forward_propagate(X_batch, type_of_non)
+
+            # Backpropagation
+            back_prop(X_batch, Y_batch, scores[:-1], scores[1:], scores[-1], type_of_non)
+
+            # Adam updates for weights and biases
+            for key in weights.keys():
+                # Adam updates
+                m_weights[key] = beta1 * m_weights[key] + (1 - beta1) * gradients["Gr" + key[-1]]
+                v_weights[key] = beta2 * v_weights[key] + (1 - beta2) * (gradients["Gr" + key[-1]] ** 2)
+
+                m_hat = m_weights[key] / (1 - beta1 ** t)
+                v_hat = v_weights[key] / (1 - beta2 ** t)
+
+                weights[key] -= learning_rate * m_hat / (np.sqrt(v_hat) + epsilon)
+
+            for key in biases.keys():
+                # Adam updates
+                m_biases[key] = beta1 * m_biases[key] + (1 - beta1) * bias_gradients["BiasGr" + key[-1]]
+                v_biases[key] = beta2 * v_biases[key] + (1 - beta2) * (bias_gradients["BiasGr" + key[-1]] ** 2)
+
+                m_hat = m_biases[key] / (1 - beta1 ** t)
+                v_hat = v_biases[key] / (1 - beta2 ** t)
+
+                biases[key] -= learning_rate * m_hat / (np.sqrt(v_hat) + epsilon)
+
+        # Calculate epoch accuracy
+        _, _, _, _, _, _, _, y_pred = forward_propagate(X_Train, type_of_non)
+        epoch_accuracy = calc_accuracy(y_pred, Y_Train)
+        print(f"Epoch {i+1}, Accuracy: {epoch_accuracy:.4f}")
+
+# Test Function
+def test(type_of_non, X_test, Y_test):
+    X_test = X_test.values
+    Y_test = Y_test.values
+
+    _, _, _, _, _, _, _, y_pred = forward_propagate(X_test, type_of_non)
+    accuracy = calc_accuracy(y_pred, Y_test)
+    print(f"Test Accuracy: {accuracy:.4f}")
+
+# Hyperparameters and Initial Setup
+n_input_neurons = 30
+n_1st_hidden = 40
+n_2nd_hidden = 40
+n_3rd_hidden = 40
+n_output_neurons = 27
+
+# Xavier Initialization
+xavier_threshold = np.sqrt(6 / (n_input_neurons + n_output_neurons))
+
+# Initialize Weights and Biases
+weights = {
+    "W1": np.random.uniform(-xavier_threshold, xavier_threshold, (n_input_neurons, n_1st_hidden)),
+    "W2": np.random.uniform(-xavier_threshold, xavier_threshold, (n_1st_hidden, n_2nd_hidden)),
+    "W3": np.random.uniform(-xavier_threshold, xavier_threshold, (n_2nd_hidden, n_3rd_hidden)),
+    "W4": np.random.uniform(-xavier_threshold, xavier_threshold, (n_3rd_hidden, n_output_neurons)),
+}
+
+biases = {
+    "B0": np.zeros(n_1st_hidden),
+    "B1": np.zeros(n_2nd_hidden),
+    "B2": np.zeros(n_3rd_hidden),
+    "B3": np.zeros(n_output_neurons),
+}
+
+# Gradients
+gradients = {f"Gr{i+1}": np.zeros_like(w) for i, w in enumerate(weights.values())}
+bias_gradients = {f"BiasGr{i}": np.zeros_like(b) for i, b in enumerate(biases.values())}
+
+# Adam Parameters
+m_weights = {key: np.zeros_like(w) for key, w in weights.items()}
+v_weights = {key: np.zeros_like(w) for key, w in weights.items()}
+m_biases = {key: np.zeros_like(b) for key, b in biases.items()}
+v_biases = {key: np.zeros_like(b) for key, b in biases.items()}
+
+beta1 = 0.9
+beta2 = 0.999
+epsilon = 1e-8
+
+# Load Data and Train the Model
+X_Train, X_Test, Y_Train, Y_Test = data_prepration("Spotify_Features.csv", test_size=0.2)
+
+learning_rate = 0.001
+type_of_non = "tanh"
+mini_batch_size = 128
+epochs = 50
+
+train(learning_rate, type_of_non, mini_batch_size, epochs, X_Train, Y_Train)
+test(type_of_non, X_Test, Y_Test)

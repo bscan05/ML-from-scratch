@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
+
 def data_prepration(name,test_size):
 
     data_file = pd.read_csv(name)
@@ -128,18 +129,18 @@ def softmax(x):
 
 
 
-def forward_propagate(input,type_of_non,scores,hidden_outputs,output):
+def forward_propagate(xbatch,type_of_non,scores,hidden_outputs,output):
 
-    scores[0] = np.dot(weights["W1"].T, input) + biases["B0"]
+    scores[0] = np.dot(xbatch,weights["W1"]) + biases["B0"]
     hidden_outputs[0] = non_linearity(type_of_non,scores[0])
 
-    scores[1] = np.dot(weights["W2"].T, hidden_outputs[0]) + biases["B1"]
+    scores[1] = np.dot(hidden_outputs[0],weights["W2"]) + biases["B1"]
     hidden_outputs[1] = non_linearity(type_of_non,scores[1])
 
-    scores[2] = np.dot(weights["W3"].T, hidden_outputs[1]) + biases["B2"]
+    scores[2] = np.dot(hidden_outputs[1],weights["W3"]) + biases["B2"]
     
     #for output layer we need softmax
-    output = softmax(scores[2])
+    output = softmax(scores[2].T).T
 
     return output
 
@@ -165,8 +166,8 @@ def back_prop(y_real,y_pred,type_of_non):
 
     deltas[2] = y_pred - y_real
 
-    deltas[1] = np.dot(weights["W3"], deltas[2]) * deriv_nonlinearity(type_of_non, scores[1])
-    deltas[0] = np.dot(weights["W2"], deltas[1]) * deriv_nonlinearity(type_of_non, scores[0])
+    deltas[1] = np.dot(deltas[2],weights["W3"].T) * deriv_nonlinearity(type_of_non, scores[1])
+    deltas[0] = np.dot(deltas[1],weights["W2"].T) * deriv_nonlinearity(type_of_non, scores[0])
     
 
 
@@ -174,7 +175,8 @@ def back_prop(y_real,y_pred,type_of_non):
 
 def train(learning_rate,type_of_non,mini_batch_size,epoch,X_Train,Y_Train):
 
-
+    X_Train = X_Train.values
+    Y_Train = Y_Train.values
 
     for i in range(epoch):
 
@@ -184,31 +186,33 @@ def train(learning_rate,type_of_non,mini_batch_size,epoch,X_Train,Y_Train):
         correct = 0
         for j in tqdm(range(total_batches), desc="Batch", unit="iteration"):
             correct = 0
-            for k in range(mini_batch_size):
-                k = k + (j * mini_batch_size)
-                row = X_Train.iloc[k]
-                y_true = Y_Train.iloc[k]
-                result = forward_propagate(row,type_of_non,scores,hidden_outputs,output)
-                back_prop(y_true,result,type_of_non)
 
-                gradients["Gr3"] += np.outer(hidden_outputs[1],deltas[2])
-                gradients["Gr2"] += np.outer(hidden_outputs[0],deltas[1])
-                gradients["Gr1"] += np.outer(row,deltas[0])
+            k = (j * mini_batch_size)
 
-                bias_gradients["BiasGr2"] += deltas[2]
-                bias_gradients["BiasGr1"] += deltas[1]
-                bias_gradients["BiasGr0"] += deltas[0]
+            xbatch = X_Train[k:(k+mini_batch_size)]
+            ybatch = Y_Train[k:(k+mini_batch_size)]
 
-                if(calc_accuracy(result,y_true)):
-                    correct+=1
 
-            weights["W3"] -= gradients["Gr3"] * (learning_rate / mini_batch_size)
-            weights["W2"] -= gradients["Gr2"] * (learning_rate / mini_batch_size)
-            weights["W1"] -= gradients["Gr1"] * (learning_rate / mini_batch_size)
+            result = forward_propagate(xbatch,type_of_non,scores,hidden_outputs,output)
+            back_prop(ybatch,result,type_of_non)
 
-            biases["B2"] -= bias_gradients["BiasGr2"] * (learning_rate / mini_batch_size)
-            biases["B1"] -= bias_gradients["BiasGr1"] * (learning_rate / mini_batch_size)
-            biases["B0"] -= bias_gradients["BiasGr0"] * (learning_rate / mini_batch_size)
+            gradients["Gr3"] += np.dot(hidden_outputs[1].T,deltas[2]) / mini_batch_size
+            gradients["Gr2"] += np.dot(hidden_outputs[0].T,deltas[1]) / mini_batch_size
+            gradients["Gr1"] += np.dot(xbatch.T,deltas[0]) / mini_batch_size
+
+            bias_gradients["BiasGr2"] = np.mean(deltas[2],axis=0)
+            bias_gradients["BiasGr1"] = np.mean(deltas[1],axis=0)
+            bias_gradients["BiasGr0"] = np.mean(deltas[0],axis=0)
+
+
+
+            weights["W3"] -= gradients["Gr3"] * (learning_rate )
+            weights["W2"] -= gradients["Gr2"] * (learning_rate )
+            weights["W1"] -= gradients["Gr1"] * (learning_rate )
+
+            biases["B2"] -= bias_gradients["BiasGr2"] * (learning_rate )
+            biases["B1"] -= bias_gradients["BiasGr1"] * (learning_rate )
+            biases["B0"] -= bias_gradients["BiasGr0"] * (learning_rate )
 
             gradients["Gr1"] = np.zeros((n_input_neurons,n_1st_hidden))
             gradients["Gr2"] = np.zeros((n_1st_hidden,n_2nd_hidden))
@@ -218,6 +222,10 @@ def train(learning_rate,type_of_non,mini_batch_size,epoch,X_Train,Y_Train):
             bias_gradients["BiasGr0"] = np.zeros(n_1st_hidden)
             bias_gradients["BiasGr1"] = np.zeros(n_2nd_hidden)
             bias_gradients["BiasGr2"] = np.zeros(n_output_neurons)
+
+            y_pred_classes = np.argmax(result, axis=1)
+            y_true_classes = np.argmax(ybatch, axis=1)
+            correct += np.sum(y_pred_classes == y_true_classes)
 
         print(f"Epoch: {i + 1}/{epoch}, Accuracy: {(correct*100) / (mini_batch_size):.4f}%")
 
@@ -243,7 +251,7 @@ X_Train,x_test,Y_Train,y_test = data_prepration("Spotify_Features.csv",test_size
 learning_rate = 0.01
 type_of_non = "tanh"
 mini_batch_size = 2048
-epoch = 20
+epoch = 100
 
 train(learning_rate,type_of_non,mini_batch_size,epoch,X_Train,Y_Train)
 
