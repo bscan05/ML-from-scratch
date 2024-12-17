@@ -9,10 +9,11 @@ def data_prepration(name,test_size):
     data_file.pop("artist_name")
     data_file.pop("track_name")
     data_file.pop("track_id")
-
+    data_file.pop("time_signature")
 
     genre_data = data_file.pop("genre")
-    data_file = pd.get_dummies(data_file,columns=["mode","key","time_signature"],dtype=int)
+    
+    data_file = pd.get_dummies(data_file,columns=["mode","key"],dtype=int)
     genre_data = pd.get_dummies(genre_data,columns=["genre"],dtype=int)
     data_file = (data_file - data_file.mean()) / data_file.std()
 

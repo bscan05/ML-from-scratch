@@ -28,7 +28,7 @@ arrays will be used:
 
 """
 
-n_input_neurons = 30
+n_input_neurons = 25
 n_1st_hidden = 40
 n_2nd_hidden = 40
 n_output_neurons = 27
@@ -215,16 +215,16 @@ def test(type_of_non,x_test,y_test):
     y_true_classes = np.argmax(y_test, axis=1)
     accuracy += np.sum(y_pred_classes == y_true_classes)
     
-    print("Accuracy: ",(accuracy*100) / len(x_test),"%")
+    print("Test Accuracy: ",(accuracy*100) / len(x_test),"%")
                 
 
 X_Train,x_test,Y_Train,y_test = data_prepration("Spotify_Features.csv",test_size=0.2)
 
 
 
-learning_rate = 0.001
+learning_rate = 0.01
 type_of_non = "tanh"
-mini_batch_size = 512
+mini_batch_size = 1024
 epoch = 200
 
 train(learning_rate,type_of_non,mini_batch_size,epoch,X_Train,Y_Train)
