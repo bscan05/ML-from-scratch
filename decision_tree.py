@@ -2,8 +2,35 @@ import pandas as pd
 import numpy as np
 from collections import Counter
 import timeit
-from data_prep import data_prepration
 
+def data_prepration(name,test_size):
+
+    data_file = pd.read_csv(name)
+    data_file = data_file.sample(frac = 1)
+
+    data_file.pop("artist_name")
+    data_file.pop("track_name")
+    data_file.pop("track_id")
+    data_file.pop("time_signature")
+
+    genre_data = data_file.pop("genre")
+
+    genre_categorical = genre_data.astype('category')
+    genre_encoded = genre_categorical.cat.codes + 1
+
+    data_file = pd.get_dummies(data_file,columns=["mode","key"],dtype=int)
+    data_file = (data_file - data_file.mean()) / data_file.std()
+
+    index = round((1 - test_size) * len(data_file)) 
+    X_Train = data_file[:index]
+    x_test = data_file[index:]
+
+    Y_Train = genre_encoded[:index]
+    y_test = genre_encoded[index:]
+
+
+
+    return X_Train,x_test,Y_Train,y_test
 
 
 class Node():
@@ -113,7 +140,7 @@ class DecisionTree():
 
         best_split = self.best_split(data)
 
-        if curr_depth < self.max_depth:
+        if curr_depth <= self.max_depth:
 
             if best_split["info_gain"] > 0:
                 print("building the tree1")
@@ -136,6 +163,29 @@ class DecisionTree():
         pass
         
 
+def print_tree(node, depth=0):
+    """
+    Recursively traverses the decision tree and prints node information.
+    
+    Parameters:
+    - node: The current node in the tree.
+    - depth: The current depth in the tree (used for indentation).
+    """
+    if node is None:
+        return
+    
+    indent = "    " * depth  # 4 spaces per depth level for indentation
+    
+    if node.predicted_value is not None:
+        # Leaf node
+        print(f"{indent}Leaf: Predict = {node.predicted_value}")
+    else:
+        # Internal node
+        print(f"{indent}Node: Feature {node.feature_index}, Threshold {node.threshold}, Info Gain {node.information_gain:.4f}")
+        # Recursively print the left and right subtrees
+        print_tree(node.left_child, depth + 1)
+        print_tree(node.right_child, depth + 1)
+
 
 
 
@@ -144,13 +194,22 @@ start = timeit.default_timer()
 
 X_Train,x_test,Y_Train,y_test = data_prepration("Spotify_Features.csv",test_size=0.2)
 
-dataset = np.concatenate([X_Train.values,Y_Train.values],axis=1)
+Y_Train=Y_Train.values
+y_test = y_test.values
+X_Train= X_Train.values
+x_test = x_test.values
+
+Y_Train = Y_Train.reshape(-1, 1)
+y_test = y_test.reshape(-1, 1)
+
+dataset = np.concatenate([X_Train,Y_Train],axis=1)
 
 
 
 decision_tree = DecisionTree(2)
 
 root = decision_tree.build_tree(dataset,0)
-print(root.left_child.predicted_value)
+print_tree(root,0)
+
 stop = timeit.default_timer()
 print('Time: ', stop - start)  
