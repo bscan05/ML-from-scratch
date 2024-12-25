@@ -1,4 +1,4 @@
-from decision_tree import DecisionTree
+from decision_tree import Tree
 import pandas as pd
 import numpy as np
 from decision_tree import data_prepration
@@ -45,9 +45,9 @@ class RandomForest():
         for i in range(number_of_trees):
             print(i+1, " tree training")
 
-            dt = DecisionTree(max_depth)
+            dt = Tree(max_depth)
             bootstrapped_data,selected_columns = self.prep_bootstrap_data(data,sample_size,feature_count)
-            dt.root = dt.build_tree(bootstrapped_data,0,jump_factor)
+            dt.root = dt.build_tree(bootstrapped_data,jump_factor,0)
             trees.append(dt)
             columns_list.append(selected_columns)
 
@@ -80,7 +80,8 @@ class RandomForest():
 
 
         for m in range(len(X_test)):
-
+            
+            print(m)
             
             if self.vote_single_row(trees,columns_list,X_test[m]) == Y_test[m]:
                 print("Predicted:",self.vote_single_row(trees,columns_list,X_test[m])," Real: ", Y_test[m])
@@ -95,34 +96,10 @@ data_train,x_test,y_test = data_prepration("Spotify_Features.csv",test_size=0.1)
 
 random_forest = RandomForest()
 
-trees,columns_list = random_forest.train(data_train,100,0.05,10,8,500)
+trees,columns_list = random_forest.train(data_train,100,0.05,10,8,10)
 
 accuracy = random_forest.test(x_test,y_test,trees,columns_list)
 
 print("Accuracy", accuracy, "%")
         
-"""
-parameters = {"test_size":[0.1,0.2,0.3],"number_of_trees":[100,150,200],"sample_ratio":[0.1,0.05,0.01],"feature_count":[7,8,9,10],"max_depth":[6,7,8],"jump_factor":[500,1000,2000]}
 
-def cross_validation(parameters,data,k):
-
-    # for each parameter combination make cross validation
-    # take one validation set out each time, calculate avarage for each combination
-    #take most 
-
-    #create batches
-    batches = []
-    split_size = round(len(data) / k)
-    for i in range(k-1):
-        array = data[i*split_size:(i+1)*split_size]
-        batches.append(array)
-    array = data[(k-1)*split_size:]
-    batches.append(array)
-
-    #for each batches try each possible scenerio, and take avarage
-    for batch in batches:
-
-
-
-    pass
-"""

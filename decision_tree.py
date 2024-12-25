@@ -47,7 +47,7 @@ def data_prepration(name,test_size):
 
 class Node():
 
-    def __init__(self, left_child=None, right_child=None, feature_index=None, threshold=None, information_gain=None, predicted_value=None):
+    def __init__(self, left_child=None, right_child=None, feature_index=None, threshold=None, information_gain=None,predicted_value=None):
         self.left_child = left_child
         self.right_child = right_child
         self.feature_index = feature_index
@@ -59,10 +59,11 @@ class Node():
 
 
 
-class DecisionTree():
+class Tree():
 
-    def __init__(self,max_depth):
+    def __init__(self,max_depth,min_info_gain=0):
         self.max_depth = max_depth
+        self.min_info_gain = min_info_gain
 
 
 
@@ -77,14 +78,10 @@ class DecisionTree():
 
     def Information_Gain(self,parent,left_child,right_child):
 
-        parent_entropy = self.entropy(parent)
-        left_entropy = self.entropy(left_child)
-        right_entropy = self.entropy(right_child)
+        left_w = len(left_child) / len(parent)
+        right_w = len(right_child) / len(parent)
 
-        left_weight = len(left_child) / len(parent)
-        right_weight = len(right_child) / len(parent)
-
-        return parent_entropy - ((left_entropy*left_weight) + (right_weight * right_entropy))
+        return self.entropy(parent) - ((self.entropy(left_child)*left_w) + (right_w * self.entropy(right_child)))
 
 
 
@@ -100,7 +97,6 @@ class DecisionTree():
 
     def best_split(self,data,num_of_iter):
 
-        best_split = {"index":-1,"info_gain":-1,"left_data":[],"right_data":[],"treshold":0}
         index = -1
         gain = -1
         left_data = []
@@ -136,55 +132,55 @@ class DecisionTree():
                         treshold = j  
                         max_info_gain = information_gain
         
-        best_split["index"] = index
-        best_split["info_gain"] = gain
-        best_split["left_data"] = left_data
-        best_split["right_data"] = right_data
-        best_split["treshold"] = treshold
+
         
-        return best_split
+        return index,gain,left_data,right_data,treshold
 
 
 
-    def build_tree(self,data,curr_depth,num_of_iter):
+    def build_tree(self,data,num_of_iter,curr_depth):
         
 
         y_train = data[:,-1]
 
-        best_split = self.best_split(data,num_of_iter)
+        index,gain,left_data,right_data,treshold = self.best_split(data,num_of_iter)
+
 
         if curr_depth < self.max_depth:
 
-            if best_split["info_gain"] > 0:
+
+            if gain > self.min_info_gain:
                 #print("building the tree1")
-                left_child = self.build_tree(best_split["left_data"],curr_depth+1,num_of_iter)
-                right_child = self.build_tree(best_split["right_data"],curr_depth+1,num_of_iter)
+                left_child = self.build_tree(left_data,num_of_iter,curr_depth+1)
+                right_child = self.build_tree(right_data,num_of_iter,curr_depth+1)
                 #print("building the tree2")
                 
-                return Node(left_child,right_child,best_split["index"],best_split["treshold"],best_split["info_gain"])
-        
+                return Node(left_child,right_child,index,treshold,gain)
+            
         value_of_node = self.find_max_occuring_label(y_train)
-        #print("building the tree")
-    
+        
         return  Node(predicted_value=value_of_node)
          
     
     def find_max_occuring_label(self,y):
-        return max(set(y), key=list(y).count)
+        a = max(set(y), key=list(y).count)
+        return a
         
 
     def predict_single(self,x_row,node):
 
-        if node.predicted_value != None:
-            return node.predicted_value
-        
-        threshold= node.threshold
-        index_of_prmt = node.feature_index
-        if x_row[index_of_prmt] <= threshold:
-            return self.predict_single(x_row,node.left_child)
-        else:
-            return self.predict_single(x_row,node.right_child)
+        node = node
+        while True:
 
+            if node.predicted_value != None:
+                return node.predicted_value
+            
+            threshold= node.threshold
+            index_of_prmt = node.feature_index
+            if x_row[index_of_prmt] <= threshold:
+                node = node.left_child
+            else:
+                node = node.right_child
 
 
     def test_data(self,x_test,y_test,root_node):
@@ -201,8 +197,8 @@ class DecisionTree():
 
 
 
-
 """
+
 start = timeit.default_timer()
 
 
@@ -210,10 +206,11 @@ data_train,x_test,y_test = data_prepration("Spotify_Features.csv",test_size=0.2)
 
 
 
-decision_tree = DecisionTree(10)
+decision_tree = Tree(5)
 
-root = decision_tree.build_tree(data_train,curr_depth=0,num_of_iter=1000)
-print_tree(root,0)
+
+
+root = decision_tree.build_tree(data_train,num_of_iter=10,curr_depth=0)
 
 stop = timeit.default_timer()
 print('Time: ', stop - start)

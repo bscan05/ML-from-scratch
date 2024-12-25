@@ -8,7 +8,7 @@ def data_prepration(name,test_size):
 
     data_file.pop("artist_name")
     data_file.pop("track_name")
-    data_file.pop("track_id")
+    data_file.pop("track_id") 
     data_file.pop("time_signature")
 
     genre_data = data_file.pop("genre")
