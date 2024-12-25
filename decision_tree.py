@@ -29,8 +29,20 @@ def data_prepration(name,test_size):
     y_test = genre_encoded[index:]
 
 
+    Y_Train=Y_Train.values
+    y_test = y_test.values
+    X_Train= X_Train.values
+    x_test = x_test.values
 
-    return X_Train,x_test,Y_Train,y_test
+    Y_Train = Y_Train.reshape(-1, 1)
+
+    data_train = np.concatenate([X_Train,Y_Train],axis=1)
+
+
+
+    return data_train,x_test,y_test
+
+
 
 
 class Node():
@@ -42,6 +54,7 @@ class Node():
         self.threshold = threshold
         self.information_gain = information_gain
         self.predicted_value = predicted_value
+        self.root = None
 
 
 
@@ -85,7 +98,7 @@ class DecisionTree():
     
 
 
-    def best_split(self,data):
+    def best_split(self,data,num_of_iter):
 
         best_split = {"index":-1,"info_gain":-1,"left_data":[],"right_data":[],"treshold":0}
         index = -1
@@ -98,12 +111,12 @@ class DecisionTree():
             
             column = data[:,i]
             unq_column = np.unique(column)
-            sorted_unique = np.sort(unq_column)  # Sort the unique values
+            sorted_unique = np.sort(unq_column)
         
             
 
-            if len(sorted_unique)>300:
-                jump = round(len(sorted_unique) / 100)
+            if len(sorted_unique)>(3*num_of_iter):
+                jump = round(len(sorted_unique) / num_of_iter)
                 sampled_thresholds = sorted_unique[::jump]
             else:
                 sampled_thresholds = sorted_unique
@@ -133,83 +146,81 @@ class DecisionTree():
 
 
 
-    def build_tree(self,data,curr_depth):
+    def build_tree(self,data,curr_depth,num_of_iter):
         
 
         y_train = data[:,-1]
 
-        best_split = self.best_split(data)
+        best_split = self.best_split(data,num_of_iter)
 
-        if curr_depth <= self.max_depth:
+        if curr_depth < self.max_depth:
 
             if best_split["info_gain"] > 0:
-                print("building the tree1")
-                left_child = self.build_tree(best_split["left_data"],curr_depth+1)
-                right_child = self.build_tree(best_split["right_data"],curr_depth+1)
-                print("building the tree2")
+                #print("building the tree1")
+                left_child = self.build_tree(best_split["left_data"],curr_depth+1,num_of_iter)
+                right_child = self.build_tree(best_split["right_data"],curr_depth+1,num_of_iter)
+                #print("building the tree2")
                 
                 return Node(left_child,right_child,best_split["index"],best_split["treshold"],best_split["info_gain"])
         
         value_of_node = self.find_max_occuring_label(y_train)
-        print("building the tree")
-        return Node(predicted_value=value_of_node)
-        
+        #print("building the tree")
+    
+        return  Node(predicted_value=value_of_node)
+         
     
     def find_max_occuring_label(self,y):
         return max(set(y), key=list(y).count)
         
 
-    def predict():
-        pass
+    def predict_single(self,x_row,node):
+
+        if node.predicted_value != None:
+            return node.predicted_value
         
+        threshold= node.threshold
+        index_of_prmt = node.feature_index
+        if x_row[index_of_prmt] <= threshold:
+            return self.predict_single(x_row,node.left_child)
+        else:
+            return self.predict_single(x_row,node.right_child)
 
-def print_tree(node, depth=0):
-    """
-    Recursively traverses the decision tree and prints node information.
-    
-    Parameters:
-    - node: The current node in the tree.
-    - depth: The current depth in the tree (used for indentation).
-    """
-    if node is None:
-        return
-    
-    indent = "    " * depth  # 4 spaces per depth level for indentation
-    
-    if node.predicted_value is not None:
-        # Leaf node
-        print(f"{indent}Leaf: Predict = {node.predicted_value}")
-    else:
-        # Internal node
-        print(f"{indent}Node: Feature {node.feature_index}, Threshold {node.threshold}, Info Gain {node.information_gain:.4f}")
-        # Recursively print the left and right subtrees
-        print_tree(node.left_child, depth + 1)
-        print_tree(node.right_child, depth + 1)
+
+
+    def test_data(self,x_test,y_test,root_node):
+
+        accuracy = 0
+        for i in range(len(x_test)):
+
+            if self.predict_single(x_test[i],root_node) == y_test[i]:
+                accuracy += 1
+        
+        return (accuracy * 100) / (len(x_test))
 
 
 
 
+
+
+"""
 start = timeit.default_timer()
 
 
-X_Train,x_test,Y_Train,y_test = data_prepration("Spotify_Features.csv",test_size=0.2)
-
-Y_Train=Y_Train.values
-y_test = y_test.values
-X_Train= X_Train.values
-x_test = x_test.values
-
-Y_Train = Y_Train.reshape(-1, 1)
-y_test = y_test.reshape(-1, 1)
-
-dataset = np.concatenate([X_Train,Y_Train],axis=1)
+data_train,x_test,y_test = data_prepration("Spotify_Features.csv",test_size=0.2)
 
 
 
-decision_tree = DecisionTree(2)
+decision_tree = DecisionTree(10)
 
-root = decision_tree.build_tree(dataset,0)
+root = decision_tree.build_tree(data_train,curr_depth=0,num_of_iter=1000)
 print_tree(root,0)
 
 stop = timeit.default_timer()
-print('Time: ', stop - start)  
+print('Time: ', stop - start)
+
+
+
+accuracy = decision_tree.test_data(x_test,y_test,root)
+
+print("Accuracy = ", accuracy,"%")
+"""
