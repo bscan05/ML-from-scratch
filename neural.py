@@ -95,7 +95,10 @@ class NeuralNetwork():
             s = 1 / (1 + np.exp(-x))
             return s * (1 - s)
         elif type == "relu":
-            return np.maximum(0, x)
+            if x>0:
+                return 1
+            else:
+                return 0
         elif type == "tanh":
             return 1 - np.tanh(x)**2
 
@@ -232,7 +235,7 @@ X_Train,x_test,Y_Train,y_test = data_prepration("Spotify_Features.csv",test_size
 
 learning_rate = 0.01
 type_of_non = "tanh"
-mini_batch_size = 512
+mini_batch_size = 16384
 epoch = 100
 
 start = timeit.default_timer()

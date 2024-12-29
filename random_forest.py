@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 from decision_tree import data_prepration
 from collections import Counter
-
+import timeit
 
 
 class RandomForest():
@@ -47,7 +47,7 @@ class RandomForest():
 
             dt = Tree(max_depth)
             bootstrapped_data,selected_columns = self.prep_bootstrap_data(data,sample_size,feature_count)
-            dt.root = dt.build_tree(bootstrapped_data,jump_factor,0)
+            dt.root = dt.create_tree(bootstrapped_data,jump_factor,0)
             trees.append(dt)
             columns_list.append(selected_columns)
 
@@ -84,22 +84,27 @@ class RandomForest():
             print(m)
             
             if self.vote_single_row(trees,columns_list,X_test[m]) == Y_test[m]:
-                print("Predicted:",self.vote_single_row(trees,columns_list,X_test[m])," Real: ", Y_test[m])
                 accuracy += 1
         
         return (accuracy * 100) / (len(X_test))
 
 
 
-data_train,x_test,y_test = data_prepration("Spotify_Features.csv",test_size=0.1)
+data_train,x_test,y_test = data_prepration("Spotify_Features.csv",test_size=0.2)
 
 
+start = timeit.default_timer()
 random_forest = RandomForest()
 
-trees,columns_list = random_forest.train(data_train,100,0.05,10,8,10)
+trees,columns_list = random_forest.train(data=data_train,number_of_trees=10,sample_ratio=0.005,feature_count=13,max_depth=7,jump_factor=200)
 
 accuracy = random_forest.test(x_test,y_test,trees,columns_list)
 
 print("Accuracy", accuracy, "%")
         
 
+
+
+
+stop = timeit.default_timer()
+print('Time: ', stop - start)

@@ -85,7 +85,7 @@ class Tree():
 
 
 
-    def split(self,data,feature,treshold):
+    def split_data(self,data,feature,treshold):
 
 
         left = data[data[:,feature] <= treshold]
@@ -95,7 +95,7 @@ class Tree():
     
 
 
-    def best_split(self,data,num_of_iter):
+    def divide_node(self,data,num_of_iter):
 
         index = -1
         gain = -1
@@ -119,7 +119,7 @@ class Tree():
 
             for j in sampled_thresholds:
 
-                left, right = self.split(data,i,j)
+                left, right = self.split_data(data,i,j)
                 
                 if len(left) and len(right):
                     information_gain = self.Information_Gain(data[:,-1],left[:,-1],right[:,-1])
@@ -138,12 +138,12 @@ class Tree():
 
 
 
-    def build_tree(self,data,num_of_iter,curr_depth):
+    def create_tree(self,data,num_of_iter,curr_depth):
         
 
         y_train = data[:,-1]
 
-        index,gain,left_data,right_data,treshold = self.best_split(data,num_of_iter)
+        index,gain,left_data,right_data,treshold = self.divide_node(data,num_of_iter)
 
 
         if curr_depth < self.max_depth:
@@ -151,18 +151,18 @@ class Tree():
 
             if gain > self.min_info_gain:
                 #print("building the tree1")
-                left_child = self.build_tree(left_data,num_of_iter,curr_depth+1)
-                right_child = self.build_tree(right_data,num_of_iter,curr_depth+1)
+                left_child = self.create_tree(left_data,num_of_iter,curr_depth+1)
+                right_child = self.create_tree(right_data,num_of_iter,curr_depth+1)
                 #print("building the tree2")
                 
                 return Node(left_child,right_child,index,treshold,gain)
             
-        value_of_node = self.find_max_occuring_label(y_train)
+        value_of_node = self.frequent_occuring_label(y_train)
         
         return  Node(predicted_value=value_of_node)
          
     
-    def find_max_occuring_label(self,y):
+    def frequent_occuring_label(self,y):
         a = max(set(y), key=list(y).count)
         return a
         
@@ -210,7 +210,7 @@ decision_tree = Tree(5)
 
 
 
-root = decision_tree.build_tree(data_train,num_of_iter=10,curr_depth=0)
+root = decision_tree.create_tree(data_train,num_of_iter=10,curr_depth=0)
 
 stop = timeit.default_timer()
 print('Time: ', stop - start)

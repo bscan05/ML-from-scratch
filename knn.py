@@ -35,6 +35,6 @@ x_test = x_test.values
 Y_Train = Y_Train.values
 y_test = y_test.values
 
-knn(201,X_Train,x_test,Y_Train,y_test)
+knn(51,X_Train,x_test,Y_Train,y_test)
 
 
